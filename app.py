@@ -1,7 +1,7 @@
-from flask import Flask
-from flask import request
+import json
+from flask import Flask, request
 
-from operatins.db_operations import get_data
+from operations.db_operations import get_data, write_data_to_DB
 
 
 app = Flask(__name__)
@@ -20,18 +20,14 @@ def currency_get():
 
 @app.get('/currency/trade/<cur_name1>/<cur_name2>')
 def currency_trade_get(cur_name1, cur_name2):
-    check_cur_name1 = get_data(f'SELECT EXISTS(SELECT title FROM currency WHERE title = "{cur_name1}")')[0][0]
-    check_cur_name2 = get_data(f'SELECT EXISTS(SELECT title FROM currency WHERE title = "{cur_name2}")')[0][0]
-    if check_cur_name1 == True and check_cur_name2 == True:
-        exchange_rate = get_data(f"""select (SELECT cost_relative_USD FROM currency
-                                WHERE act_date='2022-08-12' and title='{cur_name1}')/
-                                (SELECT cost_relative_USD FROM currency
-                                WHERE act_date='2022-08-12' and title='{cur_name2}') AS exchange;""")
-        return exchange_rate
-    if check_cur_name1 == False and check_cur_name2 == False:
-        return 'You entered the wrong currencies!'
-    no_cur = cur_name1 if check_cur_name1 == False else cur_name2
-    return f'Currency {no_cur} is not for sale!'
+    exchange_rate = get_data(f"""select (SELECT cost_relative_USD FROM currency
+                            WHERE act_date='2022-08-12' and title='{cur_name1}')/
+                            (SELECT cost_relative_USD FROM currency
+                            WHERE act_date='2022-08-12' and title='{cur_name2}') AS exchange;""")
+    if exchange_rate[0]['exchange'] is None:
+        return 'No currency for sale'
+    return exchange_rate
+
 
 
 @app.post('/currency/trade/<name1>/<name2>')
@@ -44,8 +40,7 @@ def currency_detail_info(cur_name):
     data = get_data(f"SELECT title, cost_relative_USD, amount, act_date  FROM currency WHERE title='{cur_name}'")
     if not data:
         return 'This currency is not for sale!'
-    else:
-        return data
+    return data
 
 
 @app.get('/currency/<cur_name>/review')
@@ -60,8 +55,13 @@ def currency_review(cur_name):
 
 
 @app.post('/currency/<cur_name>/review')
-def currency_review_post(name):
-    return f'Review currency {name}, POST method'
+def currency_review_post(cur_name):
+    req = request.json
+    rating = req['data']['rating']
+    comment = req['data']['comment']
+    write_data_to_DB(f"""INSERT INTO rating(currency_name, rating, comment) 
+                    VALUES('{cur_name}', {rating}, '{comment}')""")
+    return req['status']
 
 
 @app.put('/currency/<cur_name>/review')
@@ -70,7 +70,7 @@ def currency_review_put(name):
 
 
 @app.delete('/currency/<cur_name>/review')
-def currency_review_gelete(name):
+def currency_review_delete(name):
     return f'Review currency {name}, DELETE method'
 
 
