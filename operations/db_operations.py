@@ -23,3 +23,9 @@ def write_data_to_DB(querry: str) -> None:
         cursor.execute(querry)
         db.commit()
 
+
+def delete_data_from_DB(querry: str) -> None:
+    with sqlite3.connect('bd_excharngers.sqlite3') as db:
+        cursor = db.cursor()
+        cursor.execute(querry)
+        db.commit()
