@@ -21,9 +21,9 @@ def currency_get():
 def currency_trade_get(cur_name1, cur_name2):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
     exchange_rate = get_data(f"""select (SELECT cost_relative_USD FROM currency
-                            WHERE act_date='2022-08-12' and title='{cur_name1}')/
+                            WHERE act_date='{current_date}' and title='{cur_name1}')/
                             (SELECT cost_relative_USD FROM currency
-                            WHERE act_date='2022-08-12' and title='{cur_name2}') AS exchange;""")
+                            WHERE act_date='{current_date}' and title='{cur_name2}') AS exchange;""")
     if exchange_rate[0]['exchange'] is None:
         return 'No currency for sale'
     return exchange_rate
@@ -38,9 +38,9 @@ def currency_trade_post(cur_name1, cur_name2):
 
     # Get exchange rate currency 1 to currency 2
     exchange_rate_currency1_currency2 = get_data(f"""select (SELECT cost_relative_USD FROM currency
-        WHERE act_date='2022-08-12' and title='{cur_name1}')/
+        WHERE act_date='{current_date}' and title='{cur_name1}')/
         (SELECT cost_relative_USD FROM currency
-        WHERE act_date='2022-08-12' and title='{cur_name2}') AS exchange;""")
+        WHERE act_date='{current_date}' and title='{cur_name2}') AS exchange;""")
 
     # Get user's bank account of the first currency and the second currency
     user_bank_account1 = get_data(f"select * from bank_account where id_user='{id_user}' and currency='{cur_name1}'")
@@ -65,17 +65,17 @@ def currency_trade_post(cur_name1, cur_name2):
             """)
         write_data_to_DB(f"""UPDATE currency SET
             amount=(SELECT amount FROM currency 
-            WHERE title='{cur_name1}' and act_date='2022-08-12') + {how_currency_1_need} 
-            WHERE title='PLN' and act_date='2022-08-12';
+            WHERE title='{cur_name1}' and act_date='{current_date}') + {how_currency_1_need} 
+            WHERE title='{cur_name1}' and act_date='{current_date}';
             """)
         write_data_to_DB(f"""UPDATE currency SET
             amount=(SELECT amount FROM currency 
-            WHERE title='{cur_name2}' and act_date='2022-08-12') - {amount_currency_2} 
-            WHERE title='USD' and act_date='2022-08-12';
+            WHERE title='{cur_name2}' and act_date='{current_date}') - {amount_currency_2} 
+            WHERE title='{cur_name2}' and act_date='{current_date}';
             """)
         write_data_to_DB(f"""UPDATE bank_account SET
-            balance=(SELECT balance FROM bank_account WHERE id_user='user1' and currency='USD') + 50 
-            WHERE id_user='user1' and currency='USD';
+            balance=(SELECT balance FROM bank_account WHERE id_user='{id_user}' and currency='{cur_name2}') + 50 
+            WHERE id_user='{id_user}' and currency='{cur_name2}';
             """)
 
         # Record transaction in the history
@@ -92,7 +92,9 @@ def currency_trade_post(cur_name1, cur_name2):
 
 @app.get('/currency/<cur_name>')
 def currency_detail_info(cur_name):
-    data = get_data(f"SELECT title, cost_relative_USD, amount, act_date  FROM currency WHERE title='{cur_name}'")
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    data = get_data(f"""SELECT title, cost_relative_USD, amount, act_date  FROM currency WHERE title='{cur_name}' 
+        and act_date='{current_date}'""")
     if not data:
         return 'This currency is not for sale!'
     return data
