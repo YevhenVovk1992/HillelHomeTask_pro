@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }} ">
+</head>
+<body>
+    <main>
+        <div class="aside">
+            <ul>
+                <li>Currency</li>
+                <li>Rating</li>
+                <li>Exchange</li>
+                <li>User information</li>
+            </ul>
+        </div>
+        <div class="content">
+            <div class="banner">
+                <img src="{{ url_for('static', filename='img/banner.PNG') }}" alt="banner">
+            </div>
+
+            <h1>Flask API</h1>
+            <p>Start page</p>
+        </div>
+    </main>
+</body>
+</html>

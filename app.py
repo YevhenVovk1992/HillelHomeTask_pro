@@ -1,146 +1,181 @@
 import datetime
-from flask import Flask, request
+from flask import Flask, request, render_template
 
-from operations.db_operations import get_data, write_data_to_DB, delete_data_from_DB
+from models import db
+from models import (
+    User, Currency, BankAccount, Rating, MoneyTransaction, Deposit
+)
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bd_excharngers.sqlite3'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
 
 
 @app.route('/', methods=['GET'])
-def index():
-    return 'Hello! It\'s my first API'
+def index() -> str:
+    return render_template('index.html')
 
 
 @app.get('/currency')
-def currency_get():
-    data = get_data("SELECT title, avg(cost_relative_USD), amount FROM currency GROUP by title")
-    return data
+def currency_get() -> list:
+    all_currency = Currency.query.all()
+    return [item.to_dict() for item in all_currency]
 
 
 @app.get('/currency/trade/<cur_name1>/<cur_name2>')
-def currency_trade_get(cur_name1, cur_name2):
+def currency_trade_get(cur_name1: str, cur_name2: str) -> (dict, str):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    exchange_rate = get_data(f"""select (SELECT cost_relative_USD FROM currency
-                            WHERE act_date='{current_date}' and title='{cur_name1}')/
-                            (SELECT cost_relative_USD FROM currency
-                            WHERE act_date='{current_date}' and title='{cur_name2}') AS exchange;""")
-    if exchange_rate[0]['exchange'] is None:
-        return 'No currency for sale'
-    return exchange_rate
+    currency_for_sale = Currency.query.filter_by(title=cur_name1, act_date=current_date).first()
+    purchased_currency = Currency.query.filter_by(title=cur_name2, act_date=current_date).first()
+    if currency_for_sale is None or purchased_currency is None:
+        return 'Error! No currency for trade.'
+    return {
+        'exchange': f'{currency_for_sale.cost_relative_USD / purchased_currency.cost_relative_USD}',
+        'status': 'OK'
+    }
 
 
 @app.post('/currency/trade/<cur_name1>/<cur_name2>')
-def currency_trade_post(cur_name1, cur_name2):
+def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
     request_data = request.json
     id_user = request_data['data']['id_user']
     amount_currency_2 = request_data['data']['amount_currency_1']
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
     # Get exchange rate currency 1 to currency 2
-    exchange_rate_currency1_currency2 = get_data(f"""select (SELECT cost_relative_USD FROM currency
-        WHERE act_date='{current_date}' and title='{cur_name1}')/
-        (SELECT cost_relative_USD FROM currency
-        WHERE act_date='{current_date}' and title='{cur_name2}') AS exchange;""")
+    exchange_rate_currency1_currency2 = currency_trade_get(cur_name1, cur_name2)['exchange']
 
     # Get user's bank account of the first currency and the second currency
-    user_bank_account1 = get_data(f"select * from bank_account where id_user='{id_user}' and currency='{cur_name1}'")
-    user_bank_account2 = get_data(f"select * from bank_account where id_user='{id_user}' and currency='{cur_name2}'")
+    user_bank_account1 = BankAccount.query.filter_by(id_user=id_user, currency=cur_name1).first()
+    user_bank_account2 = BankAccount.query.filter_by(id_user=id_user, currency=cur_name2).first()
+    if user_bank_account1 is None or user_bank_account2 is None:
+        return 'User has not bank account'
 
     # How march currency 1 must be sold to buy currency2
-    how_currency_1_need = round(amount_currency_2 / exchange_rate_currency1_currency2[0]['exchange'], 2)
+    how_currency_1_need = round(amount_currency_2 / float(exchange_rate_currency1_currency2), 2)
 
     # Check the availability of currency 2 in the exchanger
-    how_currency_2_in_exchange = get_data(f"select * from currency where title='{cur_name2}'")
+    how_currency_1_in_exchange = Currency.query.filter_by(title=cur_name1, act_date=current_date).first()
+    how_currency_2_in_exchange = Currency.query.filter_by(title=cur_name2, act_date=current_date).first()
 
     """ Make an exchange if: 1) User has bank account with currency 
                              2) User has enough currency 1
                              3) There is enough currency 2 in the exchanger
                              """
-    if user_bank_account2 and (user_bank_account1[0]['balance'] > how_currency_1_need) and (
-            how_currency_2_in_exchange[0]['amount'] > amount_currency_2):
-        write_data_to_DB(f"""UPDATE bank_account SET 
-            balance=(SELECT balance FROM bank_account 
-            WHERE id_user='{id_user}' and currency='{cur_name1}') - {how_currency_1_need} 
-            WHERE id_user='{id_user}' AND currency='{cur_name1}';
-            """)
-        write_data_to_DB(f"""UPDATE currency SET
-            amount=(SELECT amount FROM currency 
-            WHERE title='{cur_name1}' and act_date='{current_date}') + {how_currency_1_need} 
-            WHERE title='{cur_name1}' and act_date='{current_date}';
-            """)
-        write_data_to_DB(f"""UPDATE currency SET
-            amount=(SELECT amount FROM currency 
-            WHERE title='{cur_name2}' and act_date='{current_date}') - {amount_currency_2} 
-            WHERE title='{cur_name2}' and act_date='{current_date}';
-            """)
-        write_data_to_DB(f"""UPDATE bank_account SET
-            balance=(SELECT balance FROM bank_account WHERE id_user='{id_user}' and currency='{cur_name2}') + 50 
-            WHERE id_user='{id_user}' and currency='{cur_name2}';
-            """)
+    if float(user_bank_account1.balance) > how_currency_1_need and (
+            float(how_currency_2_in_exchange.amount) > amount_currency_2
+    ):
+        user_bank_account1.balance = float(user_bank_account1.balance) - how_currency_1_need
+        how_currency_1_in_exchange.amount = float(how_currency_1_in_exchange.amount) + how_currency_1_need
+        how_currency_2_in_exchange.amount = float(how_currency_2_in_exchange.amount) - amount_currency_2
+        user_bank_account2.balance = float(user_bank_account2.balance) + amount_currency_2
+
+        # Open the session and change date
+        try:
+            db.session.add(user_bank_account1)
+            db.session.add(how_currency_1_in_exchange)
+            db.session.add(how_currency_2_in_exchange)
+            db.session.add(user_bank_account2)
+            db.session.commit()
+        except Exception:
+            return 'Data Base Error'
 
         # Record transaction in the history
-        write_data_to_DB(f"""Insert INTO money_transaction(id_user, type_operation, spent_currency, start_currency, 
-            end_currency, operation_time, received_currency, commission, from_bank_account, on_which_bank_account) 
-            VALUES('{id_user}', 'exchange', {how_currency_1_need}, '{cur_name1}', '{cur_name2}', 
-            '{current_date}', {amount_currency_2}, 0, 
-            {user_bank_account1[0]['id_bank_account']}, {user_bank_account2[0]['id_bank_account']});
-            """)
+        money_operation = MoneyTransaction(
+            id_user=id_user,
+            type_operation='exchange',
+            spent_currency=how_currency_1_need,
+            start_currency=cur_name1,
+            end_currency=cur_name2,
+            operation_time=current_date,
+            received_currency=amount_currency_2,
+            from_bank_account=user_bank_account1.id_bank_account,
+            on_which_bank_account=user_bank_account2.id_bank_account
+        )
+        try:
+            db.session.add(money_operation)
+            db.session.commit()
+        except Exception:
+            return 'Data Base Error'
+
     else:
-        return 'ERROR'
+        return 'Error'
     return request_data['status']
 
 
 @app.get('/currency/<cur_name>')
-def currency_detail_info(cur_name):
+def currency_detail_info(cur_name: str) -> (list, str):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    data = get_data(f"""SELECT title, cost_relative_USD, amount, act_date  FROM currency WHERE title='{cur_name}' 
-        and act_date='{current_date}'""")
-    if not data:
-        return 'This currency is not for sale!'
-    return data
+    currency_info = Currency.query.filter_by(title=cur_name, act_date=current_date).all()
+    if len(currency_info) == 0:
+        return 'No currency'
+    return [item.to_dict() for item in currency_info]
 
 
 @app.get('/currency/<cur_name>/review')
-def currency_review(cur_name):
-    data = get_data(f"""SELECT currency_name, 
-                    round((SELECT AVG(rating) FROM rating 
-                    GROUP BY currency_name HAVING currency_name='{cur_name}'), 3) AS rating, 
-                    comment FROM rating WHERE currency_name='{cur_name}'""")
-    if not data:
-        return 'Currency is not included in the rating'
-    return data
+def currency_review(cur_name: str) -> (list, str):
+    currency_rating = Rating.query.filter_by(id_currency=cur_name).all()
+    if len(currency_rating) == 0:
+        return 'No currency'
+    return [item.to_dict() for item in currency_rating]
 
 
 @app.post('/currency/<cur_name>/review')
-def currency_review_post(cur_name):
+def currency_review_post(cur_name: str) -> str:
     req = request.json
-    rating = req['data']['rating']
-    comment = req['data']['comment']
-    write_data_to_DB(f"""INSERT INTO rating(id_currency, rating, comment) 
-                    VALUES('{cur_name}', {rating}, '{comment}')""")
-    return req['status']
+    review = Rating(
+        id_currency=cur_name,
+        rating=int(req['data']['rating']),
+        comment=req['data']['comment']
+    )
+    try:
+        db.session.add(review)
+        db.session.commit()
+    except Exception:
+        return 'Data Base Error'
+    else:
+        return req['status']
 
 
 @app.put('/currency/<cur_name>/review')
-def currency_review_put(name):
-    return f'Review currency {name}, PUT method'
+def currency_review_put(cur_name) -> (list, str):
+    req = request.json
+    rating = int(req['data']['rating'])
+    comment = req['data']['comment']
+    id = int(req['data']['id'])
+    review = Rating.query.filter_by(id_currency=cur_name, id=id).first()
+    review.rating = rating
+    review.comment = comment
+    try:
+        db.session.add(review)
+        db.session.commit()
+    except Exception:
+        return 'Data Base Error'
+    else:
+        return req['status']
 
 
 @app.delete('/currency/<cur_name>/review')
-def currency_review_delete(cur_name):
+def currency_review_delete(cur_name: str) -> str:
     req = request.json
     id_rating = req['data']['id']
-    delete_data_from_DB(f"""DELETE FROM rating WHERE id={id_rating} and id_currency='{cur_name}' """)
-    return req['status']
+    review = Rating.query.filter_by(id_currency=cur_name, id=id_rating).first()
+    try:
+        db.session.delete(review)
+        db.session.commit()
+    except Exception:
+        return 'Data Base Error'
+    else:
+        return req['status']
 
 
 @app.get('/user/<user_name>')
-def get_user_info(user_name):
-    user = get_data(f"""SELECT user.login, bank_account.balance, bank_account.currency
-                    FROM user JOIN bank_account WHERE user.login=bank_account.user AND user.login='admin'""")
-    if not user:
-        return 'This user not registered!'
-    return f'Welcome, {user_name}\n{user}'
+def get_user_info(user_name: str) -> (list, str):
+    user_info = BankAccount.query.filter_by(id_user=user_name).all()
+    if len(user_info) == 0:
+        return 'No user'
+    return [item.to_dict() for item in user_info]
 
 
 @app.post('/user/transfer')
@@ -149,20 +184,35 @@ def user_transfer():
 
 
 @app.get('/user/<user_name>/history')
-def user_history(user_name):
-    history = get_data(f"select money_transaction.* FROM money_transaction WHERE user='{user_name}'")
-    if not history:
-        return 'Transactions not found'
-    return history
+def user_history(user_name: str) -> list:
+    history = MoneyTransaction.query.filter_by(id_user=user_name).all()
+    return [item.to_dict() for item in history]
 
 
 @app.route('/user/<user_name>/deposit', methods=['GET', 'POST'])
-def user_deposit(user_name):
+def user_deposit(user_name: str) -> (list, str):
     if request.method == 'GET':
-        user_deposit_info = get_data(f'SELECT * FROM deposit WHERE user="{user_name}"')
-        return user_deposit_info
+        user_deposit_info = Deposit.query.filter_by(id_user=user_name).all()
+        if len(user_deposit_info) == 0:
+            return 'No user deposit'
+        return [item.to_dict() for item in user_deposit_info]
     if request.method == 'POST':
-        return 'Create user deposit'
+        req = request.json
+        deposit_of_user = Deposit(
+            id_user=user_name,
+            balance=req['data']['balance'],
+            open_date=req['data']['open_date'],
+            close_date=req['data']['close_date'],
+            interest_rate=req['data']['interest_rate'],
+            conditions=req['data']['conditions']
+        )
+        try:
+            db.session.delete(deposit_of_user)
+            db.session.commit()
+        except Exception:
+            return 'Data Base Error'
+        else:
+            return req['status']
 
 
 if __name__ == "__main__":
