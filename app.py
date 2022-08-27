@@ -1,5 +1,6 @@
 import datetime
 from flask import Flask, request, render_template
+from flask_migrate import Migrate
 
 from models import db
 from models import (
@@ -10,6 +11,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bd_excharngers.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+migrate = Migrate(app, db)
 
 
 @app.route('/', methods=['GET'])
@@ -115,10 +117,17 @@ def currency_detail_info(cur_name: str) -> (list, str):
 
 @app.get('/currency/<cur_name>/review')
 def currency_review(cur_name: str) -> (list, str):
-    currency_rating = Rating.query.filter_by(id_currency=cur_name).all()
+    currency_rating = db.session.query(
+        Rating.id_currency, Rating.comment).filter(Rating.id_currency == cur_name).all()
     if len(currency_rating) == 0:
         return 'No currency'
-    return [item.to_dict() for item in currency_rating]
+    avg_rating = (
+        db.session.query(db.func.avg(Rating.rating).label('avg_rate')).filter(Rating.id_currency == cur_name).first()
+    )
+    res = [dict(i._mapping) for i in currency_rating]
+    for i in res:
+        i['avg rate'] = round(avg_rating.avg_rate, 2)
+    return res
 
 
 @app.post('/currency/<cur_name>/review')
