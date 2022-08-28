@@ -16,7 +16,7 @@ migrate = Migrate(app, db)
 
 @app.route('/', methods=['GET'])
 def index() -> str:
-    return render_template('index.html')
+    return render_template('index.html', title='Obmenka for you')
 
 
 @app.get('/currency')
