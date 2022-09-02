@@ -1,0 +1,16 @@
+version: "3.9"  # optional since v1.27.0
+services:
+  web:
+    build: .
+    image: exchange_app:latest
+    container_name: 'exchange_app'
+    ports:
+      - "5000:5000"
+  db:
+    image: 'postgres:11'
+    environment:
+      POSTGRES_PASSWORD: example
+    hostname: 'postgres_exchangers'
+    ports:
+      - "5432:5432"
+

@@ -1,10 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
 
 
 class User(db.Model):
-    id_user = db.Column(db.Integer, primary_key=True, nullable=False)
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
     login = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(50), nullable=False)
 
@@ -13,14 +15,14 @@ class User(db.Model):
 
     def to_dict(self):
         return {
-            "id_user": self.id_user,
+            "id": self.id,
             "login": self.login,
             "password": self.password
         }
 
 
 class Currency(db.Model):
-    id_currency = db.Column(db.Integer, primary_key=True, nullable=False)
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
     title = db.Column(db.String(50), nullable=False, unique=True)
     cost_relative_USD = db.Column(db.Numeric(10, 2), nullable=False)
     amount = db.Column(db.Numeric(10, 2))
@@ -31,7 +33,7 @@ class Currency(db.Model):
 
     def to_dict(self):
         return {
-            "id_currency": self.id_currency,
+            "id": self.id,
             "title": self.title,
             "cost_relative_USD": self.cost_relative_USD,
             "amount": self.amount,
@@ -40,28 +42,12 @@ class Currency(db.Model):
 
 
 class BankAccount(db.Model):
-    id_bank_account = db.Column(db.Integer, primary_key=True, nullable=False)
-    id_user = db.Column(db.String(50), nullable=False, unique=True)
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    login_user = db.Column(db.String(50), ForeignKey('user.login'), nullable=False, unique=True)
     balance = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     currency = db.Column(db.String(50))
 
-    def __repr__(self):
-        return f'{self.to_dict()}'
-
-    def to_dict(self):
-        return {
-            "id_bank_account": self.id_bank_account,
-            "id_user": self.id_user,
-            "balance": self.balance,
-            "currency": self.currency
-        }
-
-
-class Rating(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    id_currency = db.Column(db.String(50), nullable=False)
-    rating = db.Column(db.Integer, nullable=False, default=0)
-    comment = db.Column(db.String(50))
+    user = relationship('User', backref='BankAccount')
 
     def __repr__(self):
         return f'{self.to_dict()}'
@@ -69,14 +55,34 @@ class Rating(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
-            "id_currency": self.id_currency,
+            "login_user": self.login_user,
+            "balance": self.balance,
+            "currency": self.currency
+        }
+
+
+class Rating(db.Model):
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    title_currency = db.Column(db.String(50), ForeignKey('currency.title'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False, default=0)
+    comment = db.Column(db.String(50))
+
+
+
+    def __repr__(self):
+        return f'{self.to_dict()}'
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title_currency": self.title_currency,
             "rating": self.rating,
             "comment": self.comment
         }
 
 
 class MoneyTransaction(db.Model):
-    id_transaction = db.Column(db.Integer, primary_key=True, nullable=False)
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
     id_user = db.Column(db.String(50), nullable=False)
     type_operation = db.Column(db.String(30), nullable=False)
     spent_currency = db.Column(db.Numeric(10, 2))
@@ -93,7 +99,7 @@ class MoneyTransaction(db.Model):
 
     def to_dict(self):
         return {
-            "id_transaction": self.id_transaction,
+            "id": self.id,
             "id_user": self.id_user,
             "type_operation": self.type_operation,
             "spent_currency": self.spent_currency,
@@ -108,8 +114,8 @@ class MoneyTransaction(db.Model):
 
 
 class Deposit(db.Model):
-    id_deposit = db.Column(db.Integer, primary_key=True, nullable=False)
-    id_user = db.Column(db.String(50), nullable=False)
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    login_user = db.Column(db.String(50), nullable=False)
     balance = db.Column(db.Numeric(10, 2), nullable=False)
     open_date = db.Column(db.String(50), nullable=False)
     close_date = db.Column(db.String(50),default='Not close')
@@ -121,8 +127,8 @@ class Deposit(db.Model):
 
     def to_dict(self):
         return {
-            "id_deposit": self.id_deposit,
-            "id_user": self.id_user,
+            "id": self.id,
+            "login_user": self.login_user,
             "balance": self.balance,
             "open_date": self.open_date,
             "close_date": self.close_date,

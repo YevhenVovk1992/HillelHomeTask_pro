@@ -11,7 +11,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bd_excharngers.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-migrate = Migrate(app, db)
+migrate = Migrate(app, db, render_as_batch=True)
 
 
 @app.route('/', methods=['GET'])
@@ -49,8 +49,8 @@ def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
     exchange_rate_currency1_currency2 = currency_trade_get(cur_name1, cur_name2)['exchange']
 
     # Get user's bank account of the first currency and the second currency
-    user_bank_account1 = BankAccount.query.filter_by(id_user=id_user, currency=cur_name1).first()
-    user_bank_account2 = BankAccount.query.filter_by(id_user=id_user, currency=cur_name2).first()
+    user_bank_account1 = BankAccount.query.filter_by(login_user=id_user, currency=cur_name1).first()
+    user_bank_account2 = BankAccount.query.filter_by(login_user=id_user, currency=cur_name2).first()
     if user_bank_account1 is None or user_bank_account2 is None:
         return 'User has not bank account'
 
@@ -92,8 +92,8 @@ def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
             end_currency=cur_name2,
             operation_time=current_date,
             received_currency=amount_currency_2,
-            from_bank_account=user_bank_account1.id_bank_account,
-            on_which_bank_account=user_bank_account2.id_bank_account
+            from_bank_account=user_bank_account1.id,
+            on_which_bank_account=user_bank_account2.id
         )
         try:
             db.session.add(money_operation)
@@ -118,11 +118,11 @@ def currency_detail_info(cur_name: str) -> (list, str):
 @app.get('/currency/<cur_name>/review')
 def currency_review(cur_name: str) -> (list, str):
     currency_rating = db.session.query(
-        Rating.id_currency, Rating.comment).filter(Rating.id_currency == cur_name).all()
+        Rating.title_currency, Rating.comment).filter(Rating.title_currency == cur_name).all()
     if len(currency_rating) == 0:
         return 'No currency'
     avg_rating = (
-        db.session.query(db.func.avg(Rating.rating).label('avg_rate')).filter(Rating.id_currency == cur_name).first()
+        db.session.query(db.func.avg(Rating.rating).label('avg_rate')).filter(Rating.title_currency == cur_name).first()
     )
     res = [dict(i._mapping) for i in currency_rating]
     for i in res:
@@ -134,7 +134,7 @@ def currency_review(cur_name: str) -> (list, str):
 def currency_review_post(cur_name: str) -> str:
     req = request.json
     review = Rating(
-        id_currency=cur_name,
+        title_currency=cur_name,
         rating=int(req['data']['rating']),
         comment=req['data']['comment']
     )
@@ -153,7 +153,7 @@ def currency_review_put(cur_name) -> (list, str):
     rating = int(req['data']['rating'])
     comment = req['data']['comment']
     id = int(req['data']['id'])
-    review = Rating.query.filter_by(id_currency=cur_name, id=id).first()
+    review = Rating.query.filter_by(title_currency=cur_name, id=id).first()
     review.rating = rating
     review.comment = comment
     try:
@@ -169,7 +169,7 @@ def currency_review_put(cur_name) -> (list, str):
 def currency_review_delete(cur_name: str) -> str:
     req = request.json
     id_rating = req['data']['id']
-    review = Rating.query.filter_by(id_currency=cur_name, id=id_rating).first()
+    review = Rating.query.filter_by(title_currency=cur_name, id=id_rating).first()
     try:
         db.session.delete(review)
         db.session.commit()
@@ -181,7 +181,7 @@ def currency_review_delete(cur_name: str) -> str:
 
 @app.get('/user/<user_name>')
 def get_user_info(user_name: str) -> (list, str):
-    user_info = BankAccount.query.filter_by(id_user=user_name).all()
+    user_info = BankAccount.query.filter_by(login_user=user_name).all()
     if len(user_info) == 0:
         return 'No user'
     return [item.to_dict() for item in user_info]
@@ -201,14 +201,14 @@ def user_history(user_name: str) -> list:
 @app.route('/user/<user_name>/deposit', methods=['GET', 'POST'])
 def user_deposit(user_name: str) -> (list, str):
     if request.method == 'GET':
-        user_deposit_info = Deposit.query.filter_by(id_user=user_name).all()
+        user_deposit_info = Deposit.query.filter_by(login_user=user_name).all()
         if len(user_deposit_info) == 0:
             return 'No user deposit'
         return [item.to_dict() for item in user_deposit_info]
     if request.method == 'POST':
         req = request.json
         deposit_of_user = Deposit(
-            id_user=user_name,
+            login_user=user_name,
             balance=req['data']['balance'],
             open_date=req['data']['open_date'],
             close_date=req['data']['close_date'],
@@ -225,4 +225,4 @@ def user_deposit(user_name: str) -> (list, str):
 
 
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
