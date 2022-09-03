@@ -7,9 +7,9 @@ services:
     ports:
       - "5000:5000"
   db:
-    image: 'postgres:11'
+    image: 'postgres:${POSTGRES_VERSION}'
     environment:
-      POSTGRES_PASSWORD: example
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     hostname: 'postgres_exchangers'
     ports:
       - "5432:5432"

@@ -8,6 +8,7 @@ db = SQLAlchemy()
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     login = db.Column(db.String(50), nullable=False, unique=True)
+    email = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(50), nullable=False)
 
     def __repr__(self):
@@ -67,8 +68,6 @@ class Rating(db.Model):
     rating = db.Column(db.Integer, nullable=False, default=0)
     comment = db.Column(db.String(50))
 
-
-
     def __repr__(self):
         return f'{self.to_dict()}'
 
@@ -83,7 +82,8 @@ class Rating(db.Model):
 
 class MoneyTransaction(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
-    id_user = db.Column(db.String(50), nullable=False)
+    id_user_1 = db.Column(db.String(50), nullable=False)
+    id_user_2 = db.Column(db.String(50), nullable=False, default='No user')
     type_operation = db.Column(db.String(30), nullable=False)
     spent_currency = db.Column(db.Numeric(10, 2))
     start_currency = db.Column(db.String(30))
@@ -118,7 +118,7 @@ class Deposit(db.Model):
     login_user = db.Column(db.String(50), nullable=False)
     balance = db.Column(db.Numeric(10, 2), nullable=False)
     open_date = db.Column(db.String(50), nullable=False)
-    close_date = db.Column(db.String(50),default='Not close')
+    close_date = db.Column(db.String(50), default='Not close')
     interest_rate = db.Column(db.Integer, nullable=False)
     conditions = db.Column(db.Text, nullable=False)
 

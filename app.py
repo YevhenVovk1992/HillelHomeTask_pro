@@ -1,17 +1,29 @@
 import datetime
+import os
+
 from flask import Flask, request, render_template
 from flask_migrate import Migrate
+from sqlalchemy import create_engine
+from sqlalchemy_utils import database_exists, create_database
 
 from models import db
 from models import (
     User, Currency, BankAccount, Rating, MoneyTransaction, Deposit
 )
 
+
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bd_excharngers.sqlite3'
+db_connect_addresses = 'postgresql://postgres:example@postgres_exchangers:5432/db_exchangers'
+app.config['SQLALCHEMY_DATABASE_URI'] = db_connect_addresses #os.environ.get('db_connect_addresses')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+engine = create_engine(db_connect_addresses)
 migrate = Migrate(app, db, render_as_batch=True)
+
+
+# Create new database if database missing
+if not database_exists(engine.url):
+    create_database(engine.url)
 
 
 @app.route('/', methods=['GET'])
@@ -22,6 +34,8 @@ def index() -> str:
 @app.get('/currency')
 def currency_get() -> list:
     all_currency = Currency.query.all()
+    if not all_currency:
+        return ['No data']
     return [item.to_dict() for item in all_currency]
 
 
