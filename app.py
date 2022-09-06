@@ -5,6 +5,8 @@ from flask import Flask, request, render_template
 from flask_migrate import Migrate
 from sqlalchemy import create_engine
 from sqlalchemy_utils import database_exists, create_database
+from dotenv import load_dotenv
+from os.path import join, dirname
 
 from models import db
 from models import (
@@ -12,12 +14,16 @@ from models import (
 )
 
 
+# Loading environment variables into the project
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+
 app = Flask(__name__)
-db_connect_addresses = 'postgresql://postgres:example@postgres_exchangers:5432/db_exchangers'
-app.config['SQLALCHEMY_DATABASE_URI'] = db_connect_addresses #os.environ.get('db_connect_addresses')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DB_CONNECT')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-engine = create_engine(db_connect_addresses)
+engine = create_engine(os.environ.get('DB_CONNECT'))
 migrate = Migrate(app, db, render_as_batch=True)
 
 
@@ -28,6 +34,9 @@ if not database_exists(engine.url):
 
 @app.route('/', methods=['GET'])
 def index() -> str:
+    """
+    Start page display with instruction
+    """
     return render_template('index.html', title='Obmenka for you')
 
 
