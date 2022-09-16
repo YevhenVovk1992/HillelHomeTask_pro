@@ -1,9 +1,10 @@
 import datetime
 import os
 import database
+import dotenv
 
 from flask import Flask, request, render_template
-from dotenv import load_dotenv
+from sqlalchemy.sql import func
 from os.path import join, dirname
 
 
@@ -14,7 +15,7 @@ from models import (
 
 # Loading environment variables into the project
 dotenv_path = join(dirname(__file__), '.env')
-load_dotenv(dotenv_path)
+dotenv.load_dotenv(dotenv_path)
 
 
 app = Flask(__name__)
@@ -139,12 +140,12 @@ def currency_detail_info(cur_name: str) -> (list, str):
 @app.get('/currency/<cur_name>/review')
 def currency_review(cur_name: str) -> (list, str):
     database.init_db()
-    currency_rating = db.session.query(
+    currency_rating = database.db_session.query(
         Rating.title_currency, Rating.comment).filter(Rating.title_currency == cur_name).all()
     if len(currency_rating) == 0:
         return 'No currency'
     avg_rating = (
-        db.session.query(db.func.avg(Rating.rating).label('avg_rate')).filter(Rating.title_currency == cur_name).first()
+        database.db_session.query(func.avg(Rating.rating).label('avg_rate')).filter(Rating.title_currency == cur_name).first()
     )
     res = [dict(i._mapping) for i in currency_rating]
     for i in res:
@@ -162,8 +163,8 @@ def currency_review_post(cur_name: str) -> str:
     )
     database.init_db()
     try:
-        db.session.add(review)
-        db.session.commit()
+        database.db_session.add(review)
+        database.db_session.commit()
     except Exception:
         return 'Data Base Error'
     else:
@@ -181,8 +182,8 @@ def currency_review_put(cur_name) -> (list, str):
     review.rating = rating
     review.comment = comment
     try:
-        db.session.add(review)
-        db.session.commit()
+        database.db_session.add(review)
+        database.db_session.commit()
     except Exception:
         return 'Data Base Error'
     else:
@@ -196,8 +197,8 @@ def currency_review_delete(cur_name: str) -> str:
     database.init_db()
     review = Rating.query.filter_by(title_currency=cur_name, id=id_rating).first()
     try:
-        db.session.delete(review)
-        db.session.commit()
+        database.db_session.delete(review)
+        database.db_session.commit()
     except Exception:
         return 'Data Base Error'
     else:
@@ -245,8 +246,8 @@ def user_deposit(user_name: str) -> (list, str):
         )
         database.init_db()
         try:
-            db.session.delete(deposit_of_user)
-            db.session.commit()
+            database.db_session.delete(deposit_of_user)
+            database.db_session.commit()
         except Exception:
             return 'Data Base Error'
         else:
