@@ -72,7 +72,7 @@ class Rating(Base):
     __tablename__ = 'rating'
 
     id = Column(Integer, primary_key=True, nullable=False)
-    title_currency = Column(String(50), ForeignKey('currency.title'), nullable=False)
+    title_currency = Column(String(50), nullable=False)
     rating = Column(Integer, nullable=False, default=0)
     comment = Column(String(50))
 

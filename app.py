@@ -46,6 +46,7 @@ def currency_get() -> list:
 @app.get('/currency/trade/<cur_name1>/<cur_name2>')
 def currency_trade_get(cur_name1: str, cur_name2: str) -> (dict, str):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    database.init_db()
     currency_for_sale = Currency.query.filter_by(title=cur_name1, act_date=current_date).first()
     purchased_currency = Currency.query.filter_by(title=cur_name2, act_date=current_date).first()
     if currency_for_sale is None or purchased_currency is None:
@@ -62,6 +63,7 @@ def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
     id_user = request_data['data']['id_user']
     amount_currency_2 = request_data['data']['amount_currency_1']
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    database.init_db()
 
     # Get exchange rate currency 1 to currency 2
     exchange_rate_currency1_currency2 = currency_trade_get(cur_name1, cur_name2)['exchange']
@@ -127,6 +129,7 @@ def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
 @app.get('/currency/<cur_name>')
 def currency_detail_info(cur_name: str) -> (list, str):
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    database.init_db()
     currency_info = Currency.query.filter_by(title=cur_name, act_date=current_date).all()
     if len(currency_info) == 0:
         return 'No currency'
@@ -135,6 +138,7 @@ def currency_detail_info(cur_name: str) -> (list, str):
 
 @app.get('/currency/<cur_name>/review')
 def currency_review(cur_name: str) -> (list, str):
+    database.init_db()
     currency_rating = db.session.query(
         Rating.title_currency, Rating.comment).filter(Rating.title_currency == cur_name).all()
     if len(currency_rating) == 0:
@@ -156,6 +160,7 @@ def currency_review_post(cur_name: str) -> str:
         rating=int(req['data']['rating']),
         comment=req['data']['comment']
     )
+    database.init_db()
     try:
         db.session.add(review)
         db.session.commit()
@@ -171,6 +176,7 @@ def currency_review_put(cur_name) -> (list, str):
     rating = int(req['data']['rating'])
     comment = req['data']['comment']
     id = int(req['data']['id'])
+    database.init_db()
     review = Rating.query.filter_by(title_currency=cur_name, id=id).first()
     review.rating = rating
     review.comment = comment
@@ -187,6 +193,7 @@ def currency_review_put(cur_name) -> (list, str):
 def currency_review_delete(cur_name: str) -> str:
     req = request.json
     id_rating = req['data']['id']
+    database.init_db()
     review = Rating.query.filter_by(title_currency=cur_name, id=id_rating).first()
     try:
         db.session.delete(review)
@@ -199,6 +206,7 @@ def currency_review_delete(cur_name: str) -> str:
 
 @app.get('/user/<user_name>')
 def get_user_info(user_name: str) -> (list, str):
+    database.init_db()
     user_info = BankAccount.query.filter_by(login_user=user_name).all()
     if len(user_info) == 0:
         return 'No user'
@@ -212,6 +220,7 @@ def user_transfer():
 
 @app.get('/user/<user_name>/history')
 def user_history(user_name: str) -> list:
+    database.init_db()
     history = MoneyTransaction.query.filter_by(id_user=user_name).all()
     return [item.to_dict() for item in history]
 
@@ -219,6 +228,7 @@ def user_history(user_name: str) -> list:
 @app.route('/user/<user_name>/deposit', methods=['GET', 'POST'])
 def user_deposit(user_name: str) -> (list, str):
     if request.method == 'GET':
+        database.init_db()
         user_deposit_info = Deposit.query.filter_by(login_user=user_name).all()
         if len(user_deposit_info) == 0:
             return 'No user deposit'
@@ -233,6 +243,7 @@ def user_deposit(user_name: str) -> (list, str):
             interest_rate=req['data']['interest_rate'],
             conditions=req['data']['conditions']
         )
+        database.init_db()
         try:
             db.session.delete(deposit_of_user)
             db.session.commit()
