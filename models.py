@@ -92,6 +92,7 @@ class MoneyTransaction(Base):
     __tablename__ = 'money_transaction'
 
     id = Column(Integer, primary_key=True, nullable=False)
+    uuid_money_transaction = Column(String(), ForeignKey('queue_status.uuid_money_transaction'), nullable=False, unique=True)
     id_user_1 = Column(String(50), nullable=False)
     id_user_2 = Column(String(50), nullable=False, default='No user')
     type_operation = Column(String(30), nullable=False)
@@ -103,7 +104,6 @@ class MoneyTransaction(Base):
     commission = Column(Integer, default=0)
     from_bank_account = Column(Integer, nullable=False)
     on_which_bank_account = Column(Integer, nullable=False)
-    status = Column(String(50), nullable=False)
 
     def __repr__(self):
         return f'{self.to_dict()}'
@@ -112,6 +112,7 @@ class MoneyTransaction(Base):
         return {
             "id": self.id,
             "id_user": self.id_user,
+            'uuid_money_transaction': self.uuid_money_transaction,
             "type_operation": self.type_operation,
             "spent_currency": self.spent_currency,
             "start_currency": self.start_currency,
@@ -120,9 +121,10 @@ class MoneyTransaction(Base):
             "received_currency": self.received_currency,
             "commission": self.commission,
             "from_bank_account": self.from_bank_account,
-            "on_which_bank_account": self.on_which_bank_account,
-            'status': self.status
+            "on_which_bank_account": self.on_which_bank_account
         }
+
+    queue_status = relationship('QueueStatus', back_populates='MoneyTransaction')
 
 
 class Deposit(Base):
@@ -149,3 +151,13 @@ class Deposit(Base):
             "interest_rate": self.interest_rate,
             "conditions": self.conditions
         }
+
+
+class QueueStatus(Base):
+    __tablename__ = 'queue_status'
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    uuid_money_transaction = Column(String, nullable=False, unique=True)
+    operation_status = Column(String(50), nullable=False)
+
+    MoneyTransaction = relationship('MoneyTransaction', back_populates='queue_status')

@@ -1,5 +1,7 @@
 import datetime
 import os
+import uuid
+
 import database
 import dotenv
 
@@ -9,8 +11,9 @@ from os.path import join, dirname
 
 
 from models import (
-    User, Currency, BankAccount, Rating, MoneyTransaction, Deposit
+    User, Currency, BankAccount, Rating, MoneyTransaction, Deposit, QueueStatus
 )
+from celery_worker import task_money_transaction
 
 
 # Loading environment variables into the project
@@ -63,67 +66,24 @@ def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
     request_data = request.json
     id_user = request_data['data']['id_user']
     amount_currency_2 = request_data['data']['amount_currency_1']
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    database.init_db()
+    transaction_queue = uuid.uuid4()
+    status_queue = QueueStatus(
+        uuid_money_transaction=transaction_queue,
+        operation_status='Send to the celery'
+    )
+    try:
+        database.db_session.add(status_queue)
+        database.db_session.commit()
+    except Exception:
+        return 'Can not write status_queue to the database'
 
-    # Get exchange rate currency 1 to currency 2
-    exchange_rate_currency1_currency2 = currency_trade_get(cur_name1, cur_name2)['exchange']
-
-    # Get user's bank account of the first currency and the second currency
-    user_bank_account1 = BankAccount.query.filter_by(login_user=id_user, currency=cur_name1).first()
-    user_bank_account2 = BankAccount.query.filter_by(login_user=id_user, currency=cur_name2).first()
-    if user_bank_account1 is None or user_bank_account2 is None:
-        return 'User has not bank account'
-
-    # How march currency 1 must be sold to buy currency2
-    how_currency_1_need = round(amount_currency_2 / float(exchange_rate_currency1_currency2), 2)
-
-    # Check the availability of currency 2 in the exchanger
-    how_currency_1_in_exchange = Currency.query.filter_by(title=cur_name1, act_date=current_date).first()
-    how_currency_2_in_exchange = Currency.query.filter_by(title=cur_name2, act_date=current_date).first()
-
-    """ Make an exchange if: 1) User has bank account with currency 
-                             2) User has enough currency 1
-                             3) There is enough currency 2 in the exchanger
-                             """
-    if float(user_bank_account1.balance) > how_currency_1_need and (
-            float(how_currency_2_in_exchange.amount) > amount_currency_2
-    ):
-        user_bank_account1.balance = float(user_bank_account1.balance) - how_currency_1_need
-        how_currency_1_in_exchange.amount = float(how_currency_1_in_exchange.amount) + how_currency_1_need
-        how_currency_2_in_exchange.amount = float(how_currency_2_in_exchange.amount) - amount_currency_2
-        user_bank_account2.balance = float(user_bank_account2.balance) + amount_currency_2
-
-        # Open the session and change date
-        try:
-            db.session.add(user_bank_account1)
-            db.session.add(how_currency_1_in_exchange)
-            db.session.add(how_currency_2_in_exchange)
-            db.session.add(user_bank_account2)
-            db.session.commit()
-        except Exception:
-            return 'Data Base Error'
-
-        # Record transaction in the history
-        money_operation = MoneyTransaction(
-            id_user=id_user,
-            type_operation='exchange',
-            spent_currency=how_currency_1_need,
-            start_currency=cur_name1,
-            end_currency=cur_name2,
-            operation_time=current_date,
-            received_currency=amount_currency_2,
-            from_bank_account=user_bank_account1.id,
-            on_which_bank_account=user_bank_account2.id
-        )
-        try:
-            db.session.add(money_operation)
-            db.session.commit()
-        except Exception:
-            return 'Data Base Error'
-
-    else:
-        return 'Error'
+    task_money_transaction.apply_async(args=(
+        cur_name1,
+        cur_name2,
+        id_user,
+        amount_currency_2,
+        transaction_queue
+    ))
     return request_data['status']
 
 
