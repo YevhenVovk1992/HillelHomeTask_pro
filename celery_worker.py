@@ -7,33 +7,31 @@ from models import (
     Currency, BankAccount, MoneyTransaction, QueueStatus
 )
 
+
 app = Celery('celery_worker', broker='pyamqp://guest@localhost//')
 
 
-def currency_trade_get(cur_name1: str, cur_name2: str) -> (dict, str):
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    database.init_db()
+def currency_trade_get(cur_name1: str, cur_name2: str, current_date: str) -> (dict, str):
     currency_for_sale = Currency.query.filter_by(title=cur_name1, act_date=current_date).first()
     purchased_currency = Currency.query.filter_by(title=cur_name2, act_date=current_date).first()
     if currency_for_sale is None or purchased_currency is None:
-        return 'Error! No currency for trade.'
-    return {
-        'exchange': f'{currency_for_sale.cost_relative_USD / purchased_currency.cost_relative_USD}',
-        'status': 'OK'
-    }
+        return False
+    return float(currency_for_sale.cost_relative_USD/purchased_currency.cost_relative_USD)
 
 
 @app.task
-def task_money_transaction(cur_name1,
-                           cur_name2,
-                           id_user,
-                           amount_currency_2,
-                           transaction_queue):
+def task_money_transaction(cur_name1: str,
+                           cur_name2: str,
+                           id_user: str,
+                           amount_currency_2: float,
+                           transaction_queue: str) -> str:
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
     database.init_db()
 
     # Get exchange rate currency 1 to currency 2
-    exchange_rate_currency1_currency2 = currency_trade_get(cur_name1, cur_name2)['exchange']
+    exchange_rate_currency1_currency2 = currency_trade_get(cur_name1, cur_name2, current_date)
+    if not exchange_rate_currency1_currency2:
+        return 'Error! No currency for trade.'
 
     # Get user's bank account of the first currency and the second currency
     user_bank_account1 = BankAccount.query.filter_by(login_user=id_user, currency=cur_name1).first()
@@ -42,7 +40,7 @@ def task_money_transaction(cur_name1,
         return 'User has not bank account'
 
     # How march currency 1 must be sold to buy currency2
-    how_currency_1_need = round(amount_currency_2 / float(exchange_rate_currency1_currency2), 2)
+    how_currency_1_need = round(amount_currency_2 / exchange_rate_currency1_currency2, 2)
 
     # Check the availability of currency 2 in the exchanger
     how_currency_1_in_exchange = Currency.query.filter_by(title=cur_name1, act_date=current_date).first()

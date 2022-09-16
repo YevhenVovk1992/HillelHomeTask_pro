@@ -1,14 +1,12 @@
 import datetime
 import os
 import uuid
-
 import database
 import dotenv
 
 from flask import Flask, request, render_template
 from sqlalchemy.sql import func
 from os.path import join, dirname
-
 
 from models import (
     User, Currency, BankAccount, Rating, MoneyTransaction, Deposit, QueueStatus
@@ -26,7 +24,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
 @app.teardown_appcontext
-def shutdown_session(exception=None):
+def shutdown_session(exception=None) -> None:
     database.db_session.remove()
 
 
