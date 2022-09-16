@@ -1,15 +1,17 @@
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Column, Integer, String, Numeric, Text
+from database import Base
+
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
-db = SQLAlchemy()
 
+class User(Base):
+    __tablename__ = 'user'
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    login = db.Column(db.String(50), nullable=False, unique=True)
-    email = db.Column(db.String(50), nullable=False, unique=True)
-    password = db.Column(db.String(50), nullable=False)
+    id = Column(Integer, primary_key=True, nullable=False)
+    login = Column(String(50), nullable=False, unique=True)
+    email = Column(String(50), nullable=False, unique=True)
+    password = Column(String(50), nullable=False)
 
     def __repr__(self):
         return f'{self.to_dict()}'
@@ -22,12 +24,14 @@ class User(db.Model):
         }
 
 
-class Currency(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    title = db.Column(db.String(50), nullable=False, unique=True)
-    cost_relative_USD = db.Column(db.Numeric(10, 2), nullable=False)
-    amount = db.Column(db.Numeric(10, 2))
-    act_date = db.Column(db.String(30), nullable=False, default=None)
+class Currency(Base):
+    __tablename__ = 'currency'
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    title = Column(String(50), nullable=False, unique=False)
+    cost_relative_USD = Column(Numeric(10, 2), nullable=False)
+    amount = Column(Numeric(10, 2))
+    act_date = Column(String(30), nullable=False, default=None)
 
     def __repr__(self):
         return f'{self.to_dict()}'
@@ -42,11 +46,13 @@ class Currency(db.Model):
         }
 
 
-class BankAccount(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    login_user = db.Column(db.String(50), ForeignKey('user.login'), nullable=False, unique=True)
-    balance = db.Column(db.Numeric(10, 2), nullable=False, default=0)
-    currency = db.Column(db.String(50))
+class BankAccount(Base):
+    __tablename__ = 'bank_account'
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    login_user = Column(String(50), ForeignKey('user.login'), nullable=False, unique=False)
+    balance = Column(Numeric(10, 2), nullable=False, default=0)
+    currency = Column(String(50))
 
     user = relationship('User', backref='BankAccount')
 
@@ -62,11 +68,13 @@ class BankAccount(db.Model):
         }
 
 
-class Rating(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    title_currency = db.Column(db.String(50), ForeignKey('currency.title'), nullable=False)
-    rating = db.Column(db.Integer, nullable=False, default=0)
-    comment = db.Column(db.String(50))
+class Rating(Base):
+    __tablename__ = 'rating'
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    title_currency = Column(String(50), ForeignKey('currency.title'), nullable=False)
+    rating = Column(Integer, nullable=False, default=0)
+    comment = Column(String(50))
 
     def __repr__(self):
         return f'{self.to_dict()}'
@@ -80,19 +88,22 @@ class Rating(db.Model):
         }
 
 
-class MoneyTransaction(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    id_user_1 = db.Column(db.String(50), nullable=False)
-    id_user_2 = db.Column(db.String(50), nullable=False, default='No user')
-    type_operation = db.Column(db.String(30), nullable=False)
-    spent_currency = db.Column(db.Numeric(10, 2))
-    start_currency = db.Column(db.String(30))
-    end_currency = db.Column(db.String(30))
-    operation_time = db.Column(db.String(30), nullable=False)
-    received_currency = db.Column(db.Numeric(10, 2))
-    commission = db.Column(db.Integer, default=0)
-    from_bank_account = db.Column(db.Integer, nullable=False)
-    on_which_bank_account = db.Column(db.Integer, nullable=False)
+class MoneyTransaction(Base):
+    __tablename__ = 'money_transaction'
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    id_user_1 = Column(String(50), nullable=False)
+    id_user_2 = Column(String(50), nullable=False, default='No user')
+    type_operation = Column(String(30), nullable=False)
+    spent_currency = Column(Numeric(10, 2))
+    start_currency = Column(String(30))
+    end_currency = Column(String(30))
+    operation_time = Column(String(30), nullable=False)
+    received_currency = Column(Numeric(10, 2))
+    commission = Column(Integer, default=0)
+    from_bank_account = Column(Integer, nullable=False)
+    on_which_bank_account = Column(Integer, nullable=False)
+    status = Column(String(50), nullable=False)
 
     def __repr__(self):
         return f'{self.to_dict()}'
@@ -109,18 +120,21 @@ class MoneyTransaction(db.Model):
             "received_currency": self.received_currency,
             "commission": self.commission,
             "from_bank_account": self.from_bank_account,
-            "on_which_bank_account": self.on_which_bank_account
+            "on_which_bank_account": self.on_which_bank_account,
+            'status': self.status
         }
 
 
-class Deposit(db.Model):
-    id = db.Column(db.Integer, primary_key=True, nullable=False)
-    login_user = db.Column(db.String(50), nullable=False)
-    balance = db.Column(db.Numeric(10, 2), nullable=False)
-    open_date = db.Column(db.String(50), nullable=False)
-    close_date = db.Column(db.String(50), default='Not close')
-    interest_rate = db.Column(db.Integer, nullable=False)
-    conditions = db.Column(db.Text, nullable=False)
+class Deposit(Base):
+    __tablename__ = 'deposit'
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    login_user = Column(String(50), nullable=False)
+    balance = Column(Numeric(10, 2), nullable=False)
+    open_date = Column(String(50), nullable=False)
+    close_date = Column(String(50), default='Not close')
+    interest_rate = Column(Integer, nullable=False)
+    conditions = Column(Text, nullable=False)
 
     def __repr__(self):
         return f'{self.to_dict()}'

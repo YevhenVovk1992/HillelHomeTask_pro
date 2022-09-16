@@ -1,14 +1,12 @@
 import datetime
 import os
+import database
 
 from flask import Flask, request, render_template
-from flask_migrate import Migrate
-from sqlalchemy import create_engine
-from sqlalchemy_utils import database_exists, create_database
 from dotenv import load_dotenv
 from os.path import join, dirname
 
-from models import db
+
 from models import (
     User, Currency, BankAccount, Rating, MoneyTransaction, Deposit
 )
@@ -20,16 +18,12 @@ load_dotenv(dotenv_path)
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DB_CONNECT')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-engine = create_engine(os.environ.get('DB_CONNECT'))
-migrate = Migrate(app, db, render_as_batch=True)
 
 
-# Create new database if database missing
-if not database_exists(engine.url):
-    create_database(engine.url)
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    database.db_session.remove()
 
 
 @app.route('/', methods=['GET'])
@@ -42,6 +36,7 @@ def index() -> str:
 
 @app.get('/currency')
 def currency_get() -> list:
+    database.init_db()
     all_currency = Currency.query.all()
     if not all_currency:
         return ['No data']
