@@ -111,8 +111,9 @@ class MoneyTransaction(Base):
     def to_dict(self):
         return {
             "id": self.id,
-            "id_user": self.id_user,
             'uuid_money_transaction': self.uuid_money_transaction,
+            "id_user_1": self.id_user_1,
+            "id_user_2": self.id_user_2,
             "type_operation": self.type_operation,
             "spent_currency": self.spent_currency,
             "start_currency": self.start_currency,
