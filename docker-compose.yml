@@ -6,15 +6,34 @@ services:
     container_name: 'exchange_app'
     environment:
       DB_CONNECT: ${DB_CONNECT}
+      RABBIT_CONNECTION: ${RABBIT_CONNECTION}
+      SESSION_SECRET: ${SESSION_SECRET}
     restart: always
     ports:
       - "5000:5000"
+    command: python3 app.py
   db:
     image: 'postgres:${POSTGRES_VERSION}'
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     hostname: 'postgres_exchangers'
+    container_name: 'postgres_db'
     restart: always
     ports:
       - "5432:5432"
+  rabbit:
+    image: 'rabbitmq'
+    hostname: 'rabbitmq'
+    container_name: 'rabbitmq'
+    restart: always
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+  celery_worker:
+    build: .
+    restart: always
+    environment:
+      DB_CONNECT: ${DB_CONNECT}
+      RABBIT_CONNECTION: ${RABBIT_CONNECTION}
+    command: celery -A celery_worker worker --loglevel=INFO --purge --pool=solo
 
