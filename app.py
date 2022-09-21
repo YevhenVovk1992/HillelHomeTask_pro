@@ -1,25 +1,23 @@
 import datetime
 import os
 import uuid
-from typing import Union, List, Any
 
+from typing import Union
 from werkzeug import Response
-
 import database
 import dotenv
 
 from flask import Flask, request, render_template, redirect, session, url_for
-from flask_session import Session
 from sqlalchemy.sql import func
-from os.path import join, dirname
 
 from models import (
     User, Currency, BankAccount, Rating, MoneyTransaction, Deposit, QueueStatus
 )
 from celery_worker import task_money_transaction
 
+
 # Loading environment variables into the project
-dotenv_path = join(dirname(__file__), '.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 dotenv.load_dotenv(dotenv_path)
 
 app = Flask(__name__)
@@ -43,8 +41,7 @@ def index() -> Union[str, Response]:
         database.init_db()
         get_user_from_db = User.query.filter_by(login=user_login, password=user_password).all()
         if get_user_from_db:
-            session['user_name'] = user_login
-            session['user_id'] = str(get_user_from_db[0].id)
+            session[user_login] = str(get_user_from_db[0].id)
             return redirect(url_for('index', _anchor='intro'))
         else:
             error_message = 'User not registered!'
@@ -63,11 +60,11 @@ def currency_get() -> dict:
     all_currency = Currency.query.all()
     if not all_currency:
         return {
-            'data':  'No data',
+            'data': 'No data',
             'status': 'OK'
         }
     return {
-        'data':  [item.to_dict() for item in all_currency],
+        'data': [item.to_dict() for item in all_currency],
         'status': 'OK'
     }
 
@@ -90,12 +87,12 @@ def currency_trade_get(cur_name1: str, cur_name2: str) -> dict:
 
 
 @app.post('/currency/trade/<cur_name1>/<cur_name2>')
-def currency_trade_post(cur_name1: str, cur_name2: str) -> Union[Response, str]:
+def currency_trade_post(cur_name1: str, cur_name2: str) -> str:
     request_data = request.json
     login_user = request_data['data']['id_user']
     amount_currency_2 = request_data['data']['amount_currency_1']
-    if login_user != session['user_name']:
-        return redirect(url_for('index', _anchor='login'))
+    if session.get(login_user) is None:
+        return "Login in first!"
     transaction_queue = uuid.uuid4()
     status_queue = QueueStatus(
         uuid_money_transaction=transaction_queue,
@@ -210,7 +207,7 @@ def currency_review_delete(cur_name: str) -> str:
 
 @app.get('/user/<user_name>')
 def get_user_info(user_name: str) -> Union[dict, Response]:
-    if user_name != session['user_name']:
+    if session.get(user_name) is None:
         return redirect(url_for('index', _anchor='login'))
     database.init_db()
     user_info = BankAccount.query.filter_by(login_user=user_name).all()
@@ -227,7 +224,7 @@ def get_user_info(user_name: str) -> Union[dict, Response]:
 
 @app.get('/user/<user_name>/history')
 def user_history(user_name: str) -> Union[dict, Response]:
-    if user_name != session['user_name']:
+    if session.get(user_name) is None:
         return redirect(url_for('index', _anchor='login'))
     database.init_db()
     history = MoneyTransaction.query.filter_by(id_user_1=user_name).all()
@@ -237,10 +234,9 @@ def user_history(user_name: str) -> Union[dict, Response]:
     }
 
 
-
 @app.route('/user/<user_name>/deposit', methods=['GET', 'POST'])
 def user_deposit(user_name: str) -> Union[dict, str, Response]:
-    if user_name != session['user_name']:
+    if session.get(user_name) is None:
         return redirect(url_for('index', _anchor='login'))
     if request.method == 'GET':
         database.init_db()

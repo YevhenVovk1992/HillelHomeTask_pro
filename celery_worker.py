@@ -1,4 +1,6 @@
 import datetime
+import os
+import dotenv
 
 from celery import Celery
 
@@ -8,7 +10,11 @@ from models import (
 )
 
 
-app = Celery('celery_worker', broker='pyamqp://guest@localhost//')
+# Loading environment variables into the project
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+dotenv.load_dotenv(dotenv_path)
+
+app = Celery('celery_worker', broker=os.environ.get('RABBIT_CONNECTION'))
 
 
 def currency_trade_get(cur_name1: str, cur_name2: str, current_date: str) -> (dict, str):
